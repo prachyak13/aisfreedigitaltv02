@@ -1,0 +1,40 @@
+name: Update AIS Playlist
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions: contents: write
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup
+        run: |
+          pip install playwright
+          playwright install chromium
+          playwright install-deps
+      - name: Run Python
+        run: python 8_ais.py
+      - name: Update Playlist
+        run: |
+          # ใช้ Python สร้างการเขียนทับไฟล์ .w3u โดยใช้ข้อมูลจาก links.json
+          python -c "
+import json
+with open('links.json') as f: links = json.load(f)
+with open('asi_free_tv.w3u', 'r+', encoding='utf-8') as f:
+    data = json.load(f)
+    for s in data['stations']:
+        if s['name'] == 'Workpoint TV': s['url'] = links.get('23', s['url'])
+        if s['name'] == 'NBT 2 HD': s['url'] = links.get('2', s['url'])
+    f.seek(0); json.dump(data, f, ensure_ascii=False, indent=4); f.truncate()
+"
+      - name: Push changes
+        run: |
+          git config user.name 'github-actions'
+          git config user.email 'github-actions@github.com'
+          git add asi_free_tv.w3u
+          git commit -m 'Auto-update playlist via merge' || echo 'No changes'
+          git push
